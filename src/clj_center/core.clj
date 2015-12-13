@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [clojure.tools.nrepl.server :refer [start-server]])
+  (:import (java.nio.file Files attribute.PosixFilePermission))
   (:gen-class))
 
 (def ^:dynamic *nrepl-file*
@@ -16,5 +17,10 @@
         server (start-server)]
     (log/debug server)
     (spit nrepl-file (:port server))
+    (try
+      (Files/setPosixFilePermissions (.toPath nrepl-file)
+                                     #{PosixFilePermission/OWNER_READ
+                                       PosixFilePermission/OWNER_WRITE})
+      (catch UnsupportedOperationException _))
     (log/info "write nrepl port info to file: " nrepl-file-str)
     (.deleteOnExit nrepl-file)))
