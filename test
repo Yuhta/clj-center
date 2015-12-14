@@ -1,43 +1,38 @@
 #!/usr/bin/env node
 "use strict";
 
-var fs          = require('fs'),
+var Promise     = require('bluebird'),
+    fs          = Promise.promisifyAll(require('fs')),
     nreplClient = require('nrepl-client'),
     os          = require('os'),
-    path        = require('path'),
-    Q           = require('q');
+    path        = require('path');
 
 var nreplPortFile = path.join(os.homedir(), '.clj-center-nrepl-port');
 
-function nreplPortFileReady(retry) {
-    var deferred = Q.defer();
-    try {
-        var stats = fs.statSync(nreplPortFile);
+function readNreplPort(retry) {
+    return fs.statAsync(nreplPortFile).then(function (stats) {
         if (stats.size == 0) throw new Error("nrepl port file size 0");
-        deferred.resolve();
-    } catch(err) {
-        if (retry > 0) {
-            console.log("nrepl port file not ready, retrying");
-            return Q.delay(1000).then(function () {
-                return nreplPortFileReady(retry - 1);
-            });
-        } else deferred.reject(err);
-    }
-    return deferred.promise;
+        return fs.readFileAsync(nreplPortFile, 'utf8');
+    }).catch(function (err) {
+        if (retry <= 0) throw err;
+        console.log("nrepl port file not ready, retrying");
+        return Promise.delay(1000).then(function () {
+            return readNreplPort(retry - 1);
+        });
+    });
 }
 
-nreplPortFileReady(10).then(function () {
-    var port = fs.readFileSync(nreplPortFile, 'utf8');
-    var conn = nreplClient.connect({port: port});
-    return Q.ninvoke(conn, 'once', 'connect').then(function () {
-        return Q.ninvoke(conn, 'eval', '(+ 1 1)');
+readNreplPort(10).then(function (port) {
+    var conn = Promise.promisifyAll(nreplClient.connect({port: port}));
+    return conn.onceAsync('connect').then(function () {
+        return conn.evalAsync('(+ 1 1)');
     }).then(function (results) {
         if (!(results.length == 2 &&
               results[0].value === '2' &&
               results[1].status.length == 1 &&
               results[1].status[0] == 'done'))
             throw new Error(JSON.stringify(results, null, 2));
-    }).fin(function () {
+    }).finally(function () {
         conn.end();
     });
-}).done();
+});
