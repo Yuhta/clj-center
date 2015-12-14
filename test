@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+"use strict";
 
 var fs          = require('fs'),
     nreplClient = require('nrepl-client'),
@@ -22,7 +23,7 @@ function nreplPortFileReady(retry) {
             });
         } else deferred.reject(err);
     }
-    return deferred;
+    return deferred.promise;
 }
 
 nreplPortFileReady(10).then(function () {
@@ -36,6 +37,7 @@ nreplPortFileReady(10).then(function () {
               results[1].status.length == 1 &&
               results[1].status[0] == 'done'))
             throw new Error(JSON.stringify(results, null, 2));
+    }).fin(function () {
         conn.end();
     });
 }).done();
