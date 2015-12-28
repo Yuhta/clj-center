@@ -1,8 +1,4 @@
 language: clojure
 sudo: false
 before_script:
-  - nvm install 4.2
-  - npm install nrepl-client
-  - npm install bluebird
-script:
-  - lein run & ./test
+  - cd ruby; gem build cljd-client.gemspec && gem install cljd-client-*.gem
